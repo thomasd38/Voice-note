@@ -1,0 +1,175 @@
+/* 💻 Expérience desktop — trois panneaux simultanés, clavier, souris.
+   En densité « tablet », la barre latérale disparaît au profit de deux
+   colonnes : les filtres remontent alors dans l'en-tête de la liste. */
+
+.app--desktop {
+  display: grid;
+  grid-template-columns: 250px minmax(340px, 400px) 1fr;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.app--desktop[data-density='tablet'] {
+  grid-template-columns: minmax(300px, 42%) 1fr;
+}
+
+/* --- Barre latérale ------------------------------------------------------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 14px;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sidebar .filters {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar .filters__item {
+  width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.sidebar__spacer {
+  flex: 1;
+}
+
+.sidebar__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar__footer .privacy-note {
+  padding: 0 4px 8px;
+  text-align: left;
+  line-height: 1.45;
+}
+
+.sidebar__footer .button {
+  justify-content: flex-start;
+}
+
+/* --- Colonne liste -------------------------------------------------------- */
+
+.list-column {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.list-column__header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.list-column__tablet-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Les filtres tiennent sur une seule ligne, qui défile si l'écran est étroit :
+   deux rangées de puces mangeraient la hauteur utile de la liste. */
+.list-column__tablet-actions .filters {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.list-column__tablet-actions .filters::-webkit-scrollbar {
+  display: none;
+}
+
+.list-column__tablet-actions .filters__item {
+  white-space: nowrap;
+}
+
+.list-column__scroll {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.list-column__record {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.list-column__record .record-zone {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.list-column__record .record-zone__label {
+  align-items: center;
+}
+
+.list-column__record-hint {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- Colonne détail ------------------------------------------------------- */
+
+.detail-column {
+  min-width: 0;
+  padding: 26px 32px;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.note-detail[data-variant='desktop'] {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.note-detail[data-variant='desktop'] .note-detail__title {
+  font-size: 1.5rem;
+}
+
+/* Les cartes affichent plus d'informations qu'en mobile : la largeur le permet. */
+.note-card[data-variant='desktop'] .note-card__excerpt {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+@media (min-width: 1500px) {
+  .app--desktop {
+    grid-template-columns: 270px minmax(380px, 440px) 1fr;
+  }
+
+  .detail-column {
+    padding: 34px 48px;
+  }
+}
