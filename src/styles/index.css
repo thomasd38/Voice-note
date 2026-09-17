@@ -1,0 +1,8 @@
+/* Feuille de style unique, découpée par responsabilité.
+   Pas de framework CSS : l'application compte une vingtaine de composants et
+   un système de tokens suffit largement (cf. règle sur les dépendances). */
+@import './tokens.css';
+@import './base.css';
+@import './components.css';
+@import './mobile.css';
+@import './desktop.css';

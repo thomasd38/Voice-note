@@ -1,0 +1,96 @@
+/* 📱 Expérience mobile — une colonne, pouce, plein écran.
+   Le bouton micro est ancré en bas : c'est la zone atteignable d'une main. */
+
+.app--mobile {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: max(env(safe-area-inset-top, 0px), 8px) 8px 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-header__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.08rem;
+}
+
+.mobile-search {
+  padding: 10px 14px 4px;
+}
+
+.mobile-main {
+  padding: 12px 14px 8px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Sur tactile, l'action de suppression passe par la vue détail :
+   pas de cible de 30 px au coin d'une carte. */
+.note-card[data-variant='mobile'] .note-card__main {
+  padding: 15px 16px;
+  min-height: 74px;
+}
+
+.mobile-record {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  background: linear-gradient(to top, var(--surface) 65%, transparent);
+  border-top: 1px solid var(--border);
+}
+
+.mobile-record[data-recording='true'] {
+  background: var(--surface);
+}
+
+.mobile-record__cancel {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+}
+
+/* Vue détail : plein écran, glissée par-dessus la liste. */
+.mobile-detail {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  padding: max(env(safe-area-inset-top, 0px), 12px) 16px
+    calc(env(safe-area-inset-bottom, 0px) + 20px);
+  background: var(--bg);
+  overflow-y: auto;
+  animation: detail-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.note-detail[data-variant='mobile'] .note-detail__title {
+  font-size: 1.15rem;
+}
+
+/* Cibles tactiles confortables (44 px minimum). */
+.app--mobile .icon-button {
+  width: 44px;
+  height: 44px;
+}
+
+.app--mobile .button {
+  min-height: 44px;
+}
