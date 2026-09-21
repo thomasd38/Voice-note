@@ -89,11 +89,18 @@ export function App() {
         patch.audioRetentionDays !== undefined &&
         patch.audioRetentionDays !== settings.audioRetentionDays
       ) {
-        // Le nouveau délai s'applique aussi aux notes déjà enregistrées.
-        void notesApi.applyRetention(patch.audioRetentionDays);
+        // Le nouveau délai s'applique aussi aux notes déjà enregistrées ; le
+        // raccourcir peut donc supprimer des audios tout de suite : on le dit.
+        void notesApi.applyRetention(patch.audioRetentionDays).then((purged) => {
+          if (purged.removed > 0) {
+            showInfo(
+              `${purged.removed} audio${purged.removed > 1 ? 's' : ''} déjà expiré${purged.removed > 1 ? 's' : ''} au regard de ce nouveau délai ${purged.removed > 1 ? 'ont' : 'a'} été supprimé${purged.removed > 1 ? 's' : ''}. Les notes sont conservées.`,
+            );
+          }
+        });
       }
     },
-    [notesApi, settings.audioRetentionDays, updateSettings],
+    [notesApi, settings.audioRetentionDays, showInfo, updateSettings],
   );
 
   const confirmDelete = useCallback(async () => {

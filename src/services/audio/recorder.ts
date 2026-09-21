@@ -57,6 +57,9 @@ export interface RecordingResult {
 /** Durée minimale considérée comme un enregistrement valide. */
 export const MIN_RECORDING_MS = 350;
 
+/** Délai au-delà duquel on n'attend plus l'événement `stop` du navigateur. */
+export const STOP_TIMEOUT_MS = 5_000;
+
 /** Formats testés dans l'ordre de préférence (Opus d'abord, Safari ensuite). */
 const PREFERRED_MIME_TYPES = [
   'audio/webm;codecs=opus',
@@ -214,11 +217,22 @@ export class AudioRecorder {
     const durationMs = Math.max(0, this.stoppedAt - (this.startedAt ?? this.stoppedAt));
 
     const blob = await new Promise<Blob>((resolve, reject) => {
-      recorder.onstop = () => {
+      const buildBlob = () => {
         const type = recorder.mimeType || this.chunks[0]?.type || 'audio/webm';
-        resolve(new Blob(this.chunks, { type }));
+        return new Blob(this.chunks, { type });
+      };
+
+      // Filet de sécurité : si `onstop` n'arrive jamais (implémentation
+      // défaillante, onglet mis en veille…), on rend ce qui a été capturé
+      // plutôt que de laisser l'interface bloquée sur « Traitement… ».
+      const timeout = setTimeout(() => resolve(buildBlob()), STOP_TIMEOUT_MS);
+
+      recorder.onstop = () => {
+        clearTimeout(timeout);
+        resolve(buildBlob());
       };
       recorder.onerror = (event: Event) => {
+        clearTimeout(timeout);
         reject(
           new RecorderError(
             'unknown',
@@ -230,6 +244,7 @@ export class AudioRecorder {
       try {
         recorder.stop();
       } catch (error) {
+        clearTimeout(timeout);
         reject(new RecorderError('unknown', ERROR_MESSAGES.unknown, error));
       }
     }).finally(() => {

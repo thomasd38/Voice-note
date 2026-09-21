@@ -44,6 +44,14 @@ interface SpeechRecognition extends EventTarget {
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
   onend: ((event: Event) => void) | null;
   onstart: ((event: Event) => void) | null;
+  /** Le moteur a ouvert le flux audio : sans cela, il n'entend rien. */
+  onaudiostart: ((event: Event) => void) | null;
+  onaudioend: ((event: Event) => void) | null;
+  onsoundstart: ((event: Event) => void) | null;
+  onsoundend: ((event: Event) => void) | null;
+  onspeechstart: ((event: Event) => void) | null;
+  onspeechend: ((event: Event) => void) | null;
+  onnomatch: ((event: Event) => void) | null;
 }
 
 declare var SpeechRecognition: { new (): SpeechRecognition } | undefined;

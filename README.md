@@ -275,6 +275,13 @@ L'ensemble exige un **contexte sécurisé (HTTPS)** — ce que GitHub Pages four
 ## Limitations connues
 
 - **Firefox ne transcrit pas** : la Web Speech API n'y est pas implémentée.
+- **Le microphone doit être partagé** entre l'enregistrement et le moteur de reconnaissance. C'est
+  transparent sur Chrome et Edge pour ordinateur ; sur certains appareils (Safari iOS, Chrome
+  Android selon les versions), le moteur n'obtient aucun son et la note ressort sans texte.
+  L'application démarre donc la reconnaissance **avant** l'enregistrement, détecte le cas, et
+  l'explique au lieu de prétendre que rien n'a été dit. En cas de doute :
+  *Paramètres → Transcription → **Tester la transcription*** écoute deux fois (moteur seul, puis
+  pendant un enregistrement) et indique précisément ce qui bloque.
 - **La transcription est « en direct »** : le texte est produit pendant que vous parlez. Un audio
   déjà enregistré ne peut donc pas être re-transcrit tant qu'aucun provider `batch` (Whisper…) n'est
   branché — l'architecture le prévoit, la V1 ne le fournit pas.
@@ -292,14 +299,20 @@ L'ensemble exige un **contexte sécurisé (HTTPS)** — ce que GitHub Pages four
 npm test
 ```
 
-73 tests couvrent ce qui doit l'être : stockage IndexedDB (création, modification, suppression),
+87 tests couvrent ce qui doit l'être : stockage IndexedDB (création, modification, suppression),
 expiration et nettoyage des audios, recherche et accents, préférences, machine à états de
-l'enregistrement, et la traduction des erreurs en messages compréhensibles.
+l'enregistrement, orchestration enregistrement + transcription, et la traduction des erreurs en
+messages compréhensibles.
 
 Les APIs navigateur sont traitées comme il faut : IndexedDB tourne pour de vrai via
 `fake-indexeddb`, tandis que `MediaRecorder`, `getUserMedia` et `SpeechRecognition` sont remplacés
-par des doublures qui permettent de simuler un refus de permission, un enregistrement trop court ou
-une coupure du moteur de reconnaissance.
+par des doublures qui permettent de simuler un refus de permission, un enregistrement trop court,
+un microphone déjà occupé ou un moteur de reconnaissance qui ne reçoit aucun son.
+
+`src/hooks/use-voice-recorder.test.ts` est le test d'intégration à connaître : magnétophone,
+provider et hook réels, seules les deux APIs navigateur sont simulées. Il verrouille l'ordre
+d'acquisition du microphone et garantit qu'un audio est toujours enregistré, même quand la
+transcription échoue.
 
 ## Dépendances
 
@@ -314,8 +327,8 @@ Le projet en compte quatre en production… enfin, deux : `react` et `react-dom`
 | **Pas de librairie d'icônes** | Quatorze icônes SVG inline, quelques centaines d'octets |
 | **Pas de librairie de dates** | `Intl.DateTimeFormat` fait le travail en français |
 
-Côté développement : `vitest`, `jsdom` et `fake-indexeddb` pour les tests, `@types/node` pour la
-configuration de build.
+Côté développement : `vitest`, `jsdom`, `fake-indexeddb` et `@testing-library/react` pour les
+tests, `@types/node` pour la configuration de build.
 
 ---
 

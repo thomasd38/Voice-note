@@ -58,6 +58,15 @@ export function useVoiceRecorder({
   const speechErrorRef = useRef<SpeechError | null>(null);
   const unsubscribeRef = useRef<(() => void)[]>([]);
   const busyRef = useRef(false);
+  /**
+   * Numéro de la session d'enregistrement en cours.
+   *
+   * Le démarrage du moteur de transcription est asynchrone : si l'utilisateur
+   * arrête l'enregistrement pendant ce court instant, la session qui se
+   * terminait ne doit pas se déclarer « démarrée » après coup — sinon le micro
+   * resterait ouvert et la note afficherait une erreur trompeuse.
+   */
+  const sessionRef = useRef(0);
   const handlersRef = useRef({ onError, onInfo, onNoteCreated, createNote });
   handlersRef.current = { onError, onInfo, onNoteCreated, createNote };
 
@@ -79,31 +88,24 @@ export function useVoiceRecorder({
   const start = useCallback(async () => {
     if (busyRef.current || recorder.getState() !== 'idle') return;
     busyRef.current = true;
+    const session = sessionRef.current + 1;
+    sessionRef.current = session;
     speechErrorRef.current = null;
     speechStartedRef.current = false;
     setLiveTranscript('');
     setStatus('requesting');
 
-    try {
-      await recorder.start();
-      setPermissionDenied(false);
-    } catch (error) {
-      setStatus('idle');
-      busyRef.current = false;
-      if (error instanceof RecorderError) {
-        if (error.kind === 'permission-denied') setPermissionDenied(true);
-        handlersRef.current.onError(error.message);
-      } else {
-        handlersRef.current.onError("L'enregistrement n'a pas pu démarrer.");
-      }
-      return;
-    }
-
-    setStatus('recording');
-    busyRef.current = false;
-
-    // La transcription démarre après l'enregistrement : même si elle échoue,
-    // l'audio est déjà en cours de capture.
+    // 1. Le moteur de transcription DÉMARRE EN PREMIER.
+    //
+    // Deux raisons, qui expliquaient des notes systématiquement vides :
+    //  - le micro est partagé, et le moteur du navigateur est le consommateur
+    //    fragile : arrivé après MediaRecorder, il n'obtient aucun son sur
+    //    plusieurs plateformes (Safari iOS, Chrome Android) et rend un texte
+    //    vide sans la moindre erreur ;
+    //  - Safari exige que `recognition.start()` parte d'un geste utilisateur.
+    //    Or `await` rompt cette chaîne : démarrer le moteur après la demande de
+    //    micro le plaçait hors du geste, et l'appel échouait en silence.
+    // Le démarrer d'abord règle les deux — et évite de perdre le premier mot.
     if (settings.autoTranscribe && speechProvider) {
       unsubscribeRef.current = [
         speechProvider.onResult(({ final, interim }) => {
@@ -115,6 +117,15 @@ export function useVoiceRecorder({
       ];
       try {
         await speechProvider.start({ lang: settings.language });
+        if (sessionRef.current !== session) {
+          // L'enregistrement s'est arrêté pendant le démarrage du moteur :
+          // on referme immédiatement ce qui vient de s'ouvrir.
+          speechProvider.abort();
+          detachSpeech();
+          busyRef.current = false;
+          setStatus('idle');
+          return;
+        }
         speechStartedRef.current = true;
       } catch (error) {
         speechStartedRef.current = false;
@@ -122,6 +133,54 @@ export function useVoiceRecorder({
         detachSpeech();
       }
     }
+
+    // 2. Puis l'enregistrement audio — qui, lui, ne doit JAMAIS être sacrifié.
+    try {
+      await recorder.start();
+      setPermissionDenied(false);
+    } catch (error) {
+      // Le micro peut avoir été refusé au magnétophone parce que le moteur de
+      // transcription le monopolise : on libère la transcription et on retente
+      // une fois. Mieux vaut un audio sans texte que rien du tout.
+      //
+      // Uniquement en cas de conflit de périphérique : réessayer après un refus
+      // d'autorisation ne ferait que redemander la permission pour rien.
+      const deviceConflict = error instanceof RecorderError && error.kind === 'microphone-busy';
+      let recovered = false;
+      if (deviceConflict && speechStartedRef.current && speechProvider) {
+        speechProvider.abort();
+        detachSpeech();
+        speechStartedRef.current = false;
+        speechErrorRef.current = new SpeechError(
+          'no-audio',
+          "La transcription a été désactivée pour cet enregistrement : sur cet appareil, le microphone ne peut pas être partagé avec le moteur de reconnaissance.",
+        );
+        try {
+          await recorder.start();
+          setPermissionDenied(false);
+          recovered = true;
+        } catch {
+          /* second échec : on remonte l'erreur d'origine ci-dessous */
+        }
+      }
+
+      if (!recovered) {
+        speechProvider?.abort();
+        detachSpeech();
+        setStatus('idle');
+        busyRef.current = false;
+        if (error instanceof RecorderError) {
+          if (error.kind === 'permission-denied') setPermissionDenied(true);
+          handlersRef.current.onError(error.message);
+        } else {
+          handlersRef.current.onError("L'enregistrement n'a pas pu démarrer.");
+        }
+        return;
+      }
+    }
+
+    setStatus('recording');
+    busyRef.current = false;
   }, [detachSpeech, recorder, settings.autoTranscribe, settings.language, speechProvider]);
 
   const finalizeNote = useCallback(
@@ -171,6 +230,8 @@ export function useVoiceRecorder({
   const stop = useCallback(async () => {
     if (recorder.getState() !== 'recording' || busyRef.current) return;
     busyRef.current = true;
+    // Clôt la session : un démarrage de transcription encore en vol s'annulera.
+    sessionRef.current += 1;
     setStatus('processing');
 
     let result: RecordingResult | null = null;
@@ -213,6 +274,7 @@ export function useVoiceRecorder({
 
   const cancel = useCallback(() => {
     if (recorder.getState() === 'idle') return;
+    sessionRef.current += 1;
     recorder.cancel();
     speechProvider?.abort();
     detachSpeech();

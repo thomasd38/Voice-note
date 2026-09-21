@@ -147,10 +147,14 @@ export function useNotes({ retentionDays, onError }: UseNotesOptions) {
     async (days: RetentionDays) => {
       try {
         await repository.applyRetention(days);
-        await repository.purgeExpiredAudio();
+        // Raccourcir la durée peut rendre des audios immédiatement expirés :
+        // on renvoie le bilan pour que l'interface puisse le dire.
+        const purged = await repository.purgeExpiredAudio();
         await refresh();
+        return purged;
       } catch (error) {
         report(error, "La durée de conservation n'a pas pu être appliquée.");
+        return { removed: 0, freedBytes: 0 };
       }
     },
     [refresh, report],

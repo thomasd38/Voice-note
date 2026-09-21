@@ -1071,6 +1071,92 @@
   color: var(--text-muted);
 }
 
+/* --- Diagnostic de la transcription --------------------------------------- */
+
+.speech-test {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.speech-test__live {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.speech-test__step {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.speech-test__transcript {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  font-style: italic;
+  min-height: 1.4em;
+}
+
+.speech-test__verdict {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--border-strong);
+  background: var(--surface-2);
+  font-size: 0.85rem;
+}
+
+.speech-test__verdict[data-tone='ok'] {
+  border-left-color: var(--success);
+}
+
+.speech-test__verdict[data-tone='warn'] {
+  border-left-color: #d97706;
+}
+
+.speech-test__verdict[data-tone='error'] {
+  border-left-color: var(--danger);
+}
+
+.speech-test__results {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+}
+
+.speech-test__results dt {
+  color: var(--text-muted);
+}
+
+.speech-test__results dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.speech-test__details {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.speech-test__details summary {
+  cursor: pointer;
+}
+
+.speech-test__details p {
+  margin-top: 6px;
+}
+
+.speech-test__trail {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
 /* --- Filtres -------------------------------------------------------------- */
 
 .filters {
