@@ -17,13 +17,43 @@ class FakeRecognition {
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null = null;
   onend: ((event: Event) => void) | null = null;
   onstart: ((event: Event) => void) | null = null;
+  onaudiostart: ((event: Event) => void) | null = null;
+  onaudioend: ((event: Event) => void) | null = null;
+  onsoundstart: ((event: Event) => void) | null = null;
+  onsoundend: ((event: Event) => void) | null = null;
+  onspeechstart: ((event: Event) => void) | null = null;
+  onspeechend: ((event: Event) => void) | null = null;
+  onnomatch: ((event: Event) => void) | null = null;
 
   constructor() {
     FakeRecognition.instances.push(this);
   }
 
+  /** Scénario simulé : ce que le moteur fait (ou ne fait pas) au démarrage. */
+  static behaviour: 'normal' | 'no-audio' | 'audio-only' | 'speech-no-result' = 'normal';
+
   start() {
     this.started += 1;
+    switch (FakeRecognition.behaviour) {
+      case 'no-audio':
+        // Le cas signalé : la session se termine aussitôt, sans le moindre son
+        // et sans erreur — le moteur n'a jamais obtenu le microphone.
+        queueMicrotask(() => this.onend?.(new Event('end')));
+        break;
+      case 'audio-only':
+        this.onaudiostart?.(new Event('audiostart'));
+        queueMicrotask(() => this.onend?.(new Event('end')));
+        break;
+      case 'speech-no-result':
+        this.onaudiostart?.(new Event('audiostart'));
+        this.onsoundstart?.(new Event('soundstart'));
+        this.onspeechstart?.(new Event('speechstart'));
+        queueMicrotask(() => this.onend?.(new Event('end')));
+        break;
+      default:
+        this.onaudiostart?.(new Event('audiostart'));
+        break;
+    }
   }
 
   stop() {
@@ -64,6 +94,117 @@ function installRecognition() {
 afterEach(() => {
   delete (window as { SpeechRecognition?: unknown }).SpeechRecognition;
   delete (window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
+  FakeRecognition.behaviour = 'normal';
+});
+
+/**
+ * Le symptôme rapporté en usage réel : des notes systématiquement vides, avec
+ * le message « aucune parole détectée » alors que l'utilisateur a parlé.
+ * La cause : le moteur n'obtient jamais le micro et se termine en silence —
+ * sans résultat ET sans erreur. Il ne doit plus jamais échouer sans le dire.
+ */
+describe('moteur qui ne reçoit aucun son', () => {
+  it('signale « no-audio » au lieu de rester muet', async () => {
+    const restore = installRecognition();
+    FakeRecognition.behaviour = 'no-audio';
+
+    const provider = new WebSpeechProvider();
+    const errors: SpeechError[] = [];
+    provider.onError((error) => errors.push(error));
+
+    await provider.start({ lang: 'fr-FR' });
+    const text = await provider.stop();
+
+    expect(text).toBe('');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].kind).toBe('no-audio');
+    expect(errors[0].message).toContain('microphone');
+
+    restore();
+  });
+
+  it('cesse de relancer une session qui se termine à vide', async () => {
+    const restore = installRecognition();
+    FakeRecognition.behaviour = 'no-audio';
+
+    const provider = new WebSpeechProvider();
+    await provider.start({ lang: 'fr-FR' });
+    await provider.stop();
+
+    // Trois sessions vides suffisent à conclure : pas 20 relances inutiles.
+    expect(provider.getDiagnostics().sessions).toBeLessThanOrEqual(3);
+    expect(FakeRecognition.instances[0].started).toBeLessThanOrEqual(3);
+
+    restore();
+  });
+
+  it('distingue « micro ouvert mais silencieux » de « micro jamais ouvert »', async () => {
+    const restore = installRecognition();
+    FakeRecognition.behaviour = 'audio-only';
+
+    const provider = new WebSpeechProvider();
+    const errors: SpeechError[] = [];
+    provider.onError((error) => errors.push(error));
+
+    await provider.start({ lang: 'fr-FR' });
+    await provider.stop();
+
+    expect(errors[0]?.kind).toBe('no-speech');
+    expect(provider.getDiagnostics().gotAudio).toBe(true);
+
+    restore();
+  });
+
+  it('distingue « parole entendue mais aucun texte rendu »', async () => {
+    const restore = installRecognition();
+    FakeRecognition.behaviour = 'speech-no-result';
+
+    const provider = new WebSpeechProvider();
+    const errors: SpeechError[] = [];
+    provider.onError((error) => errors.push(error));
+
+    await provider.start({ lang: 'fr-FR' });
+    await provider.stop();
+
+    expect(errors[0]?.kind).toBe('no-result');
+    const diagnostics = provider.getDiagnostics();
+    expect(diagnostics.gotSpeech).toBe(true);
+    expect(diagnostics.finalCount).toBe(0);
+
+    restore();
+  });
+
+  it('ne signale aucune erreur quand du texte a bien été produit', async () => {
+    const restore = installRecognition();
+    const provider = new WebSpeechProvider();
+    const errors: SpeechError[] = [];
+    provider.onError((error) => errors.push(error));
+
+    await provider.start({ lang: 'fr-FR' });
+    FakeRecognition.instances[0].emit('une phrase bien transcrite', true);
+    const text = await provider.stop();
+
+    expect(text).toBe('une phrase bien transcrite');
+    expect(errors).toHaveLength(0);
+
+    restore();
+  });
+
+  it('expose une trace d\'événements exploitable pour le diagnostic', async () => {
+    const restore = installRecognition();
+    const provider = new WebSpeechProvider();
+
+    await provider.start({ lang: 'fr-FR' });
+    FakeRecognition.instances[0].emit('bonjour', true);
+    await provider.stop();
+
+    const names = provider.getDiagnostics().events.map((event) => event.name);
+    expect(names).toContain('audiostart');
+    expect(names.some((name) => name.startsWith('result'))).toBe(true);
+    expect(provider.getDiagnostics().lang).toBe('fr-FR');
+
+    restore();
+  });
 });
 
 /* --- Tests ---------------------------------------------------------------- */
@@ -135,6 +276,29 @@ describe('transcription', () => {
     expect(recognition.started).toBe(2);
 
     provider.abort();
+    restore();
+  });
+
+  it('coupe la reconnaissance si le navigateur n\'émet jamais « end »', async () => {
+    vi.useFakeTimers();
+    const restore = installRecognition();
+    const provider = new WebSpeechProvider();
+    await provider.start({ lang: 'fr-FR' });
+
+    const recognition = FakeRecognition.instances[0];
+    recognition.emit('texte capté', true);
+    // Navigateur défaillant : `stop()` n'entraîne aucun événement `end`.
+    recognition.stop = () => {};
+    const aborted = vi.fn();
+    recognition.abort = aborted;
+
+    const pending = provider.stop();
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(await pending).toBe('texte capté');
+    expect(aborted).toHaveBeenCalled();
+
+    vi.useRealTimers();
     restore();
   });
 

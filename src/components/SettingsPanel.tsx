@@ -15,6 +15,7 @@ import {
 import { formatBytes } from '../utils/format';
 import { DownloadIcon, LockIcon } from './Icons';
 import { Modal } from './Modal';
+import { SpeechTest } from './SpeechTest';
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -48,9 +49,11 @@ export function SettingsPanel({
     }
   }, []);
 
+  // Changer la durée de conservation peut supprimer des audios : les chiffres
+  // affichés juste au-dessus doivent suivre.
   useEffect(() => {
     void refreshStats();
-  }, [refreshStats]);
+  }, [refreshStats, settings.audioRetentionDays]);
 
   const handlePurge = async () => {
     setBusy(true);
@@ -182,6 +185,16 @@ export function SettingsPanel({
               ))}
             </select>
           </label>
+
+          {speechSupported && (
+            <>
+              <p className="settings__muted">
+                Vos notes ressortent vides ? Ce test écoute deux fois — le moteur seul, puis
+                pendant un enregistrement — et indique précisément ce qui bloque.
+              </p>
+              <SpeechTest providerId={settings.speechProviderId} lang={settings.language} />
+            </>
+          )}
         </section>
 
         <section className="settings__section">

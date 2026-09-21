@@ -10,7 +10,11 @@
 export type SpeechErrorKind =
   | 'unsupported'
   | 'permission-denied'
+  /** Le moteur n'a jamais reçu de son : micro monopolisé, coupé ou muet. */
+  | 'no-audio'
   | 'no-speech'
+  /** Le moteur a entendu de la parole mais n'a rendu aucun texte. */
+  | 'no-result'
   | 'network'
   | 'aborted'
   | 'language-unavailable'
@@ -32,7 +36,11 @@ export const SPEECH_ERROR_MESSAGES: Record<SpeechErrorKind, string> = {
   unsupported: "La transcription automatique n'est pas disponible dans ce navigateur.",
   'permission-denied':
     "L'accès au microphone a été refusé : la transcription automatique n'a pas pu démarrer.",
+  'no-audio':
+    "Le moteur de transcription n'a reçu aucun son : sur cet appareil, il ne peut pas partager le microphone avec l'enregistrement. Testez la transcription depuis les paramètres.",
   'no-speech': "Aucune parole n'a été détectée dans cet enregistrement.",
+  'no-result':
+    "Le moteur de reconnaissance a entendu du son mais n'a renvoyé aucun texte. Vérifiez la langue choisie et votre connexion.",
   network:
     'La transcription a échoué : le moteur de reconnaissance vocale du navigateur est injoignable (connexion requise).',
   aborted: 'La transcription a été interrompue.',
@@ -42,6 +50,30 @@ export const SPEECH_ERROR_MESSAGES: Record<SpeechErrorKind, string> = {
 
 export function speechErrorMessage(kind: SpeechErrorKind): string {
   return SPEECH_ERROR_MESSAGES[kind];
+}
+
+/**
+ * Trace d'exécution d'une session de transcription.
+ *
+ * Indispensable pour diagnostiquer : quand rien ne sort du moteur, seule la
+ * suite des événements dit POURQUOI — micro jamais ouvert, son reçu mais aucune
+ * parole, parole entendue mais aucun texte rendu…
+ */
+export interface SpeechDiagnostics {
+  lang: string;
+  /** Nombre de sessions du moteur (relances automatiques comprises). */
+  sessions: number;
+  /** Le moteur a ouvert un flux audio (`audiostart`). */
+  gotAudio: boolean;
+  /** Le moteur a détecté un son quelconque (`soundstart`). */
+  gotSound: boolean;
+  /** Le moteur a détecté de la parole (`speechstart`). */
+  gotSpeech: boolean;
+  resultCount: number;
+  finalCount: number;
+  errors: string[];
+  /** Suite horodatée des événements (ms depuis le démarrage). */
+  events: { at: number; name: string }[];
 }
 
 /** Mise à jour de transcription : texte confirmé + hypothèse en cours. */
@@ -86,6 +118,9 @@ export interface SpeechToTextProvider {
 
   onResult(listener: SpeechResultListener): Unsubscribe;
   onError(listener: SpeechErrorListener): Unsubscribe;
+
+  /** Trace de la dernière session, pour diagnostic. */
+  getDiagnostics(): SpeechDiagnostics;
 
   /**
    * Transcrit un audio déjà enregistré (mode `batch` uniquement).

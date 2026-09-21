@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AudioRecorder, RecorderError, isRecordingSupported } from './recorder';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AudioRecorder, RecorderError, STOP_TIMEOUT_MS, isRecordingSupported } from './recorder';
 
 /* --- Doublures des APIs navigateur ---------------------------------------- */
 
@@ -13,6 +13,8 @@ class FakeMediaRecorder {
   onerror: ((event: Event) => void) | null = null;
   /** Permet aux tests de simuler un enregistrement vide. */
   static nextChunk: Blob | null = null;
+  /** Simule un navigateur qui n'émet jamais l'événement `stop`. */
+  static swallowStop = false;
 
   constructor(
     public stream: MediaStream,
@@ -29,7 +31,7 @@ class FakeMediaRecorder {
     this.state = 'inactive';
     const chunk = FakeMediaRecorder.nextChunk ?? new Blob(['audio'], { type: this.mimeType });
     if (chunk.size > 0) this.ondataavailable?.({ data: chunk });
-    this.onstop?.();
+    if (!FakeMediaRecorder.swallowStop) this.onstop?.();
   }
 }
 
@@ -70,6 +72,11 @@ function domError(name: string) {
 
 beforeEach(() => {
   FakeMediaRecorder.nextChunk = null;
+  FakeMediaRecorder.swallowStop = false;
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 /* --- Tests ---------------------------------------------------------------- */
@@ -180,6 +187,24 @@ describe('gestion des erreurs', () => {
     advance(2000);
 
     await expect(recorder.stop()).rejects.toMatchObject({ kind: 'too-short' });
+  });
+
+  it('ne reste pas bloqué si le navigateur n\'émet jamais « stop »', async () => {
+    vi.useFakeTimers();
+    const { recorder, advance, track } = setup();
+    FakeMediaRecorder.swallowStop = true;
+
+    await recorder.start();
+    advance(2000);
+
+    const pending = recorder.stop();
+    await vi.advanceTimersByTimeAsync(STOP_TIMEOUT_MS);
+    const result = await pending;
+
+    // L'audio capturé jusque-là est rendu, et le micro est bien relâché.
+    expect(result.blob.size).toBeGreaterThan(0);
+    expect(recorder.getState()).toBe('idle');
+    expect(track.stop).toHaveBeenCalled();
   });
 
   it('refuse de s\'arrêter si aucun enregistrement n\'est en cours', async () => {
