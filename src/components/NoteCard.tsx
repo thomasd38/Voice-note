@@ -1,9 +1,9 @@
 import { memo, useMemo } from 'react';
 import type { Note } from '../types/note';
-import { formatDuration, formatNoteDate } from '../utils/format';
+import { formatNoteDate } from '../utils/format';
 import { highlightSegments, normalizeForSearch } from '../utils/text';
 import { AudioPlayer } from './AudioPlayer';
-import { PlayIcon, TrashIcon } from './Icons';
+import { TrashIcon } from './Icons';
 
 interface NoteCardProps {
   note: Note;
@@ -97,25 +97,17 @@ function NoteCardComponent({
           <time dateTime={new Date(note.createdAt).toISOString()}>
             {formatNoteDate(note.createdAt)}
           </time>
-          {/* Sur desktop la carte porte déjà un lecteur avec sa durée :
+          {/* La carte porte un lecteur avec sa durée quand l'audio existe :
               inutile de répéter l'information dans la ligne de métadonnées. */}
-          {note.hasAudio ? (
-            variant === 'mobile' && (
-              <span className="note-card__badge">
-                <PlayIcon size={12} />
-                {formatDuration(note.audioDuration)}
-              </span>
-            )
-          ) : (
-            note.audioSize !== undefined && (
-              <span className="note-card__badge note-card__badge--muted">Audio expiré</span>
-            )
+          {!note.hasAudio && note.audioSize !== undefined && (
+            <span className="note-card__badge note-card__badge--muted">Audio expiré</span>
           )}
           {note.edited && <span className="note-card__badge note-card__badge--muted">Modifiée</span>}
         </footer>
       </button>
 
-      {variant === 'desktop' && note.hasAudio && (
+      {/* Écouter une note depuis la liste, sans l'ouvrir. */}
+      {note.hasAudio && (
         <div className="note-card__player">
           <AudioPlayer
             noteId={note.id}

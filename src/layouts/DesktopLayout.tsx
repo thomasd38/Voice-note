@@ -19,8 +19,7 @@ interface DesktopLayoutProps extends LayoutProps {
  * Trois panneaux visibles en même temps — filtres, liste, note — pour exploiter
  * la largeur : on lit une note sans perdre la liste de vue. Le clavier est
  * traité comme une entrée de premier plan (voir `useKeyboardShortcuts`) et
- * chaque carte affiche plus d'informations que sur mobile, dont son lecteur
- * audio directement dans la liste.
+ * chaque carte affiche plus d'informations que sur mobile.
  */
 export function DesktopLayout({
   notes,

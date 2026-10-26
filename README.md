@@ -235,7 +235,7 @@ Ce ne sont pas deux tailles du même écran, mais deux mises en scène des même
 | Micro            | Gros bouton rond (76 px) ancré en bas, au pouce | Bouton au pied de la liste + raccourci `R`         |
 | Note ouverte     | Plein écran, avec retour                      | Panneau de détail permanent, la liste reste visible |
 | Filtres          | Masqués (recherche seule)                     | Barre latérale dédiée                               |
-| Carte de note    | Compacte : titre, extrait, durée              | Plus dense : extrait plus long + lecteur intégré    |
+| Carte de note    | Compacte : titre, extrait, lecteur intégré    | Plus dense : extrait plus long + lecteur intégré    |
 | Suppression      | Depuis le détail                              | Au survol de la carte, ou touche `Suppr`            |
 | Messages système | En haut (le bas appartient au micro)          | En bas à droite                                     |
 

@@ -43,6 +43,12 @@
   min-height: 74px;
 }
 
+/* Le lecteur de la carte se manie au pouce : bouton plus grand qu'au curseur. */
+.note-card[data-variant='mobile'] .audio-player__play {
+  width: 38px;
+  height: 38px;
+}
+
 .mobile-record {
   display: flex;
   flex-direction: column;

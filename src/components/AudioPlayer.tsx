@@ -13,6 +13,15 @@ interface AudioPlayerProps {
 const SPEEDS = [1, 1.5, 2] as const;
 
 /**
+ * Audio en cours de lecture, tous lecteurs confondus.
+ *
+ * La liste affiche un lecteur par carte : sans ce verrou, lancer une note puis
+ * une autre les ferait jouer en même temps. Démarrer un lecteur met donc en
+ * pause le précédent, dont l'événement `pause` remet l'état à jour.
+ */
+let activeAudio: HTMLAudioElement | null = null;
+
+/**
  * Lecteur audio minimal maison.
  *
  * Le lecteur natif est laid et incohérent d'un navigateur à l'autre ; celui-ci
@@ -38,6 +47,7 @@ export function AudioPlayer({ noteId, duration, variant = 'full', loadAudioUrl }
     setError(null);
     if (audioRef.current) {
       audioRef.current.pause();
+      if (activeAudio === audioRef.current) activeAudio = null;
       audioRef.current = null;
     }
     if (urlRef.current) {
@@ -50,6 +60,7 @@ export function AudioPlayer({ noteId, duration, variant = 'full', loadAudioUrl }
   useEffect(
     () => () => {
       audioRef.current?.pause();
+      if (activeAudio === audioRef.current) activeAudio = null;
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
       urlRef.current = null;
     },
@@ -74,6 +85,8 @@ export function AudioPlayer({ noteId, duration, variant = 'full', loadAudioUrl }
         if (Number.isFinite(audio.duration) && audio.duration > 0) setTotalDuration(audio.duration);
       };
       audio.ontimeupdate = () => setCurrentTime(audio.currentTime);
+      // Couvre aussi la pause imposée par un autre lecteur (voir `activeAudio`).
+      audio.onpause = () => setPlaying(false);
       audio.onended = () => {
         setPlaying(false);
         setCurrentTime(0);
@@ -97,6 +110,8 @@ export function AudioPlayer({ noteId, duration, variant = 'full', loadAudioUrl }
     const audio = await ensureAudio();
     if (!audio) return;
     if (audio.paused) {
+      if (activeAudio && activeAudio !== audio) activeAudio.pause();
+      activeAudio = audio;
       try {
         await audio.play();
         setPlaying(true);
@@ -134,6 +149,9 @@ export function AudioPlayer({ noteId, duration, variant = 'full', loadAudioUrl }
   }
 
   const max = totalDuration > 0 ? totalDuration : 0;
+  // Avant la première lecture, la position « 0:00 » n'apporte rien : la
+  // version compacte n'affiche alors que la durée, comme un badge.
+  const started = playing || currentTime > 0;
 
   return (
     <div className={`audio-player audio-player--${variant}`}>
@@ -151,20 +169,21 @@ export function AudioPlayer({ noteId, duration, variant = 'full', loadAudioUrl }
         {playing ? <PauseIcon size={18} /> : <PlayIcon size={18} />}
       </button>
 
+      <input
+        type="range"
+        className="audio-player__progress"
+        min={0}
+        max={max || 1}
+        step={0.1}
+        value={Math.min(currentTime, max || 1)}
+        onChange={handleSeek}
+        aria-label="Position de lecture"
+        aria-valuetext={`${formatDuration(currentTime)} sur ${formatDuration(max)}`}
+        disabled={max === 0}
+      />
+
       {variant === 'full' ? (
         <>
-          <input
-            type="range"
-            className="audio-player__progress"
-            min={0}
-            max={max || 1}
-            step={0.1}
-            value={Math.min(currentTime, max || 1)}
-            onChange={handleSeek}
-            aria-label="Position de lecture"
-            aria-valuetext={`${formatDuration(currentTime)} sur ${formatDuration(max)}`}
-            disabled={max === 0}
-          />
           <span className="audio-player__time" aria-hidden="true">
             {formatDuration(currentTime)} / {formatDuration(max)}
           </span>
@@ -178,7 +197,10 @@ export function AudioPlayer({ noteId, duration, variant = 'full', loadAudioUrl }
           </button>
         </>
       ) : (
-        <span className="audio-player__time">{formatDuration(max || duration)}</span>
+        <span className="audio-player__time" aria-hidden="true">
+          {started ? `${formatDuration(currentTime)} / ` : ''}
+          {formatDuration(max || duration)}
+        </span>
       )}
     </div>
   );
